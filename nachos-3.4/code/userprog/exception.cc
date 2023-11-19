@@ -106,19 +106,27 @@ void childFunction(int pid) {
 int doFork(int functionAddr) {
 
     // 1. Check if sufficient memory exists to create new process
-    // currentThread->space->GetNumPages() <= mm->GetFreePageCount()
+    //currentThread->space->GetNumPages() <= mm->GetFreePageCount()
     // if check fails, return -1
-
+    if (currentThread->space->GetNumPages() > machine->GetFreePageCount()) {
+        return -1;
+    }
     // 2. SaveUserState for the parent thread
-    // currentThread->SaveUserState();
+
+    currentThread->SaveUserState();
 
     // 3. Create a new address space for child by copying parent address space
     // Parent: currentThread->space
     // childAddrSpace: new AddrSpace(currentThread->space)
 
+    AddrSpace *childAddrSpace = new AddrSpace(currentThread->space);
+
     // 4. Create a new thread for the child and set its addrSpace
     // childThread = new Thread("childThread")
     // child->space = childAddSpace;
+
+    Thread *childThread = new Thread("childThread");
+    childThread->space = childAddrSpace;
 
     // 5. Create a PCB for the child and connect it all up
     // pcb: pcbManager->AllocatePCB();
@@ -126,19 +134,33 @@ int doFork(int functionAddr) {
     // set parent for child pcb
     // add child for parent pcb
 
+    PCB *pcb = pcbManager->AllocatePCB();
+    pcb->thread = childThread;
+
     // 6. Set up machine registers for child and save it to child thread
     // PCReg: functionAddr
     // PrevPCReg: functionAddr-4
     // NextPCReg: functionAddr+4
     // childThread->SaveUserState();
 
+    childThread->userRegisters[PCReg] = functionAddr;
+    childThread->userRegisters[PrevPCReg] = functionAddr - 4;
+    childThread->userRegisters[NextPCReg] = functionAddr + 4;
+    childThread->SaveUserState();
+
     // 7. Restore register state of parent user-level process
     // currentThread->RestoreUserState()
+
+    currentThread->RestoreUserState();
 
     // 8. Call thread->fork on Child
     // childThread->Fork(childFunction, pcb->pid)
 
+    childThread->Fork(childFunction, (void*)pcb->pid);
+
     // 9. return pcb->pid;
+
+    return pcb->pid;
 
 }
 
